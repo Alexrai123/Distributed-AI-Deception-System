@@ -1,0 +1,60 @@
+{
+    "templates": [
+        {
+            "id": "nginx_default_site",
+            "category": "web_config",
+            "default_path": "/etc/nginx/sites-available/default",
+            "description": "Standard Nginx HTTP/HTTPS server block exposing internal proxy routes.",
+            "content_template": "server {\n    listen 80 default_server;\n    listen [::]:80 default_server;\n\n    root /var/www/html;\n    index index.html index.htm index.nginx-debian.html;\n\n    server_name _;\n\n    location / {\n        try_files $uri $uri/ =404;\n    }\n\n    location /api/ {\n        proxy_pass http://{{INTERNAL_IP}}:8000;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_addrs;\n    }\n\n    location /admin_panel/ {\n        auth_basic \"Administrator Login\";\n        auth_basic_user_file /etc/nginx/.htpasswd;\n    }\n}\n"
+        },
+        {
+            "id": "prod_env_file",
+            "category": "environment_variables",
+            "default_path": "/var/www/html/.env",
+            "description": "Production environment variables file containing sensitive application secrets.",
+            "content_template": "APP_ENV=production\nAPP_DEBUG=false\nAPP_KEY=base64:{{APP_ENCRYPTION_KEY}}\nAPP_URL=https://{{PUBLIC_DOMAIN}}\n\nDB_CONNECTION=mysql\nDB_HOST={{DB_HOST}}\nDB_PORT=3306\nDB_DATABASE={{DB_NAME}}\nDB_USERNAME={{DB_USER}}\nDB_PASSWORD={{DB_PASSWORD}}\n\nREDIS_HOST={{INTERNAL_IP}}\nREDIS_PASSWORD={{REDIS_PASSWORD}}\nREDIS_PORT=6379\n\nMAIL_MAILER=smtp\nMAIL_HOST=smtp.mailgun.org\nMAIL_PORT=587\nMAIL_USERNAME={{ADMIN_EMAIL}}\nMAIL_PASSWORD={{MAILGUN_API_KEY}}\nMAIL_ENCRYPTION=tls\n"
+        },
+        {
+            "id": "docker_compose_stack",
+            "category": "web_config",
+            "default_path": "/var/www/html/docker-compose.yml",
+            "description": "Docker Compose file detailing the microservices architecture and linked database passwords.",
+            "content_template": "version: '3.8'\nservices:\n  web:\n    image: nginx:alpine\n    ports:\n      - \"80:80\"\n      - \"443:443\"\n    volumes:\n      - ./:/var/www/html\n    depends_on:\n      - app\n      - db\n\n  app:\n    build:\n      context: .\n      dockerfile: Dockerfile.prod\n    environment:\n      - DB_HOST=db\n      - DB_USER={{DB_USER}}\n      - DB_PASSWORD={{DB_PASSWORD}}\n      - REDIS_HOST=redis\n    restart: always\n\n  db:\n    image: mysql:8.0\n    environment:\n      - MYSQL_ROOT_PASSWORD={{DB_ROOT_PASSWORD}}\n      - MYSQL_DATABASE={{DB_NAME}}\n      - MYSQL_USER={{DB_USER}}\n      - MYSQL_PASSWORD={{DB_PASSWORD}}\n    volumes:\n      - db_data:/var/lib/mysql\n\n  redis:\n    image: redis:alpine\n    command: redis-server --requirepass {{REDIS_PASSWORD}}\n\nvolumes:\n  db_data:\n"
+        },
+        {
+            "id": "root_bash_history",
+            "category": "system_logs",
+            "default_path": "/root/.bash_history",
+            "description": "Command history for the root user revealing recent internal migrations and SSH lateral movements.",
+            "content_template": "ls -la\npwd\napt-get update\napt-get install -y docker.io docker-compose\nsystemctl start docker\nsystemctl enable docker\ncd /var/www/html\nnano .env\ndocker-compose up -d\nmysql -u root -p'{{DB_ROOT_PASSWORD}}' -e \"SHOW DATABASES;\"\nssh -i /root/.ssh/id_rsa_internal admin@{{INTERNAL_IP}}\nping 8.8.8.8\ncat /var/log/auth.log | grep Failed\nufw status\nscp backup.tar.gz backup_user@{{BACKUP_SERVER}}:/mnt/storage/\nhistory -c\n"
+        },
+        {
+            "id": "aws_credentials",
+            "category": "secret_notes",
+            "default_path": "/root/.aws/credentials",
+            "description": "Exposed locally configured AWS CLI credentials profile.",
+            "content_template": "[default]\naws_access_key_id = AKIA{{RANDOM_AWS_ID_16}}\naws_secret_access_key = {{RANDOM_AWS_SECRET_40}}\nregion = us-east-1\noutput = json\n\n[staging]\naws_access_key_id = AKIA{{RANDOM_AWS_ID_STAGING}}\naws_secret_access_key = {{RANDOM_AWS_SECRET_STAGING}}\nregion = us-west-2\n"
+        },
+        {
+            "id": "db_backup_script",
+            "category": "scripts",
+            "default_path": "/opt/scripts/backup_db.sh",
+            "description": "Nightly cron script used to dump the MySQL database and send to an FTP server.",
+            "content_template": "#!/bin/bash\n# Nightly Database Backup Script\n# Last updated by {{ADMIN_NAME}} \n\nDATE=$(date +%Y%m%d_%H%M%S)\nBACKUP_DIR=\"/var/backups/mysql\"\nFILE_NAME=\"db_backup_$DATE.sql.gz\"\n\n# Database credentials\nUSER=\"{{DB_ROOT_USER}}\"\nPASSWORD=\"{{DB_ROOT_PASSWORD}}\"\nHOST=\"localhost\"\nDB_NAME=\"{{DB_NAME}}\"\n\n# Dump and compress\nmysqldump -u$USER -p$PASSWORD -h$HOST $DB_NAME | gzip > \"$BACKUP_DIR/$FILE_NAME\"\n\n# Sync to remote backup server\necho \"Syncing to remote backup server {{BACKUP_SERVER}}...\"\nsshpass -p '{{BACKUP_SERVER_PASSWORD}}' scp \"$BACKUP_DIR/$FILE_NAME\" backup_service@{{BACKUP_SERVER}}:/mnt/backups/prod/\n\necho \"Backup completed.\"\n"
+        },
+        {
+            "id": "dev_notes_txt",
+            "category": "secret_notes",
+            "default_path": "/root/migration_notes.txt",
+            "description": "Plaintext notes left behind by an administrator discussing upcoming system changes and temporary passwords.",
+            "content_template": "Notes for Server Migration (Weekend)\n------------------------------------\n\n1. Need to update the Redis cache server password. Currently using '{{REDIS_PASSWORD}}' which is weak.\n2. Do NOT forget to regenerate the JWT Secret '{{JWT_SECRET}}' before launch.\n3. The staging database is accessible on {{INTERNAL_IP}}:3306. \n   Temporary login: staging_admin / {{STAGING_PASSWORD}}\n4. Email server configuration is confirmed working with {{ADMIN_EMAIL}}.\n5. Ask DevOps to restrict access to the /admin_panel/ on Nginx.\n"
+        },
+        {
+            "id": "python_deploy_script",
+            "category": "scripts",
+            "default_path": "/opt/deploy/update_prod.py",
+            "description": "Python fabric or basic deployment script pulling new git repos into production.",
+            "content_template": "#!/usr/bin/env python3\nimport os\nimport subprocess\n\nGITHUB_TOKEN = '{{GITHUB_PAT_TOKEN}}'\nREPO_URL = f\"https://{GITHUB_TOKEN}@github.com/{{ORG_NAME}}/core-backend.git\"\nTARGET_DIR = \"/var/www/core-backend\"\n\ndef deploy():\n    print(\"Starting deployment to Production...\")\n    \n    if not os.path.exists(TARGET_DIR):\n        print(f\"Cloning repository into {TARGET_DIR}...\")\n        subprocess.run([\"git\", \"clone\", REPO_URL, TARGET_DIR], check=True)\n    else:\n        print(\"Pulling latest changes...\")\n        subprocess.run([\"git\", \"-C\", TARGET_DIR, \"pull\"], check=True)\n        \n    print(\"Restarting application services...\")\n    subprocess.run([\"systemctl\", \"restart\", \"backend.service\"], check=True)\n    print(\"Deployment successful.\")\n\nif __name__ == '__main__':\n    deploy()\n"
+        }
+    ]
+}

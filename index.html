@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEURAL CORE | AI THREAT CENTER</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Leaflet CSS for Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        zinc: {
+                            950: '#09090b',
+                            900: '#18181b',
+                            800: '#27272a',
+                        },
+                        rose: {
+                            500: '#f43f5e',
+                            600: '#e11d48',
+                        },
+                        cyan: {
+                            400: '#22d3ee',
+                        },
+                        emerald: {
+                            400: '#34d399',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #09090b;
+        }
+
+        .glass-panel {
+            background: rgba(24, 24, 27, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(39, 39, 42, 0.8);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #18181b;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #3f3f46;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #52525b;
+        }
+
+        /* Leaflet Dark Matter Map Restyle */
+        .leaflet-container {
+            background: #09090B !important;
+        }
+
+        .leaflet-layer {
+            filter: grayscale(100%) invert(100%) brightness(50%) hue-rotate(200deg) contrast(1.5) !important;
+        }
+
+        /* Pulsing dot animation */
+        @keyframes pulse-emerald {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.5;
+                transform: scale(1.1);
+                box-shadow: 0 0 10px #34d399;
+            }
+        }
+
+        .animate-status-led {
+            animation: pulse-emerald 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        .blinking-marker {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            display: block;
+            position: relative;
+        }
+
+        .blinking-marker::after {
+            content: '';
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+
+        .blinking-marker.block {
+            background: #f43f5e;
+            box-shadow: 0 0 12px #f43f5e;
+        }
+
+        .blinking-marker.block::after {
+            background: #f43f5e;
+            opacity: 0.6;
+        }
+
+        .blinking-marker.allow {
+            background: #22d3ee;
+            box-shadow: 0 0 12px #22d3ee;
+        }
+
+        .blinking-marker.allow::after {
+            background: #22d3ee;
+            opacity: 0.6;
+        }
+
+        @keyframes ping {
+
+            75%,
+            100% {
+                transform: scale(3);
+                opacity: 0;
+            }
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: white !important;
+                color: black !important;
+                overflow: auto !important;
+                display: block !important;
+                height: auto !important;
+                margin: 0;
+                padding: 0;
+            }
+
+            .glass-panel {
+                background: none !important;
+                border: none !important;
+                box-shadow: none !important;
+                backdrop-filter: none !important;
+            }
+
+            header,
+            #map,
+            #latencyChart,
+            #inspector-content,
+            #inspector-placeholder,
+            button {
+                display: none !important;
+            }
+
+            .col-span-6,
+            .col-span-3 {
+                display: none !important;
+            }
+
+            body>*:not(#print-container) {
+                display: none !important;
+            }
+
+            #print-container {
+                display: block !important;
+            }
+        }
+    </style>
+</head>
+
+<body class="text-zinc-200 font-sans h-screen w-screen overflow-hidden flex flex-col p-4 gap-4">
+
+    <!-- HEADER 12-col grid span -->
+    <header class="glass-panel rounded-xl px-6 py-4 flex justify-between items-center shadow-lg w-full">
+        <div class="flex items-center gap-6">
+            <h1 class="text-2xl font-bold tracking-widest text-white uppercase"><span class="text-cyan-400">NEURAL
+                    CORE</span> | AI THREAT CENTER</h1>
+            <div class="flex items-center gap-2 border border-zinc-800 bg-zinc-900/50 px-3 py-1 rounded-full">
+                <div class="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-status-led"></div>
+                <span class="text-xs font-mono text-emerald-400 font-semibold tracking-wider">SYSTEM ARMED</span>
+            </div>
+        </div>
+
+        <!-- Resource Monitor -->
+        <div class="hidden md:flex flex-col gap-1.5 w-[340px] px-4 border-l border-zinc-800">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1.5">
+                    <div class="flex justify-between text-[11px] font-mono text-zinc-400">
+                        <span>HOST_CPU</span><span id="cpu-text" class="text-cyan-400">--%</span>
+                    </div>
+                    <div class="w-full bg-zinc-800 rounded-full h-1.5">
+                        <div id="cpu-bar" class="bg-cyan-400 h-1.5 rounded-full transition-all duration-1000"
+                            style="width: 0%"></div>
+                    </div>
+                    <div class="flex justify-between text-[10px] font-mono text-zinc-500 mt-0.5">
+                        <span>CPU_TEMP</span><span id="temp-text" class="text-amber-500">--°C</span>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-1.5 border-l border-zinc-800/50 pl-4">
+                    <div class="flex justify-between text-[11px] font-mono text-zinc-400">
+                        <span>HOST_RAM</span><span id="ram-text" class="text-rose-500">--%</span>
+                    </div>
+                    <div class="w-full bg-zinc-800 rounded-full h-1.5">
+                        <div id="ram-bar" class="bg-rose-500 h-1.5 rounded-full transition-all duration-1000"
+                            style="width: 0%"></div>
+                    </div>
+                    <div class="flex justify-between text-[10px] font-mono text-zinc-500 mt-0.5">
+                        <span>NVIDIA_GPU</span><span id="gpu-text" class="text-emerald-400">--%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div class="text-right mr-2">
+                <div id="utc-clock"
+                    class="text-lg font-mono font-semibold tracking-widest text-white decoration-zinc-500">00:00:00 UTC
+                </div>
+                <div class="text-xs text-zinc-500 tracking-widest font-mono">GLOBAL DEPLOYMENT</div>
+            </div>
+            <button onclick="window.print()"
+                class="bg-indigo-600/30 hover:bg-indigo-500 text-indigo-400 hover:text-white px-3 py-2 rounded-lg transition-colors border border-indigo-500/50 flex items-center gap-2 font-semibold text-xs tracking-wider shadow-[0_0_10px_rgba(79,70,229,0.3)]">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z">
+                    </path>
+                </svg>
+                EXPORT
+            </button>
+            <button onclick="toggleFullScreen()"
+                class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-2 rounded-lg transition-colors border border-zinc-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- KPI RIBBON -->
+    <div class="grid grid-cols-3 gap-3 w-full flex-none">
+        <div class="glass-panel py-2 px-4 rounded-xl flex flex-col justify-center relative overflow-hidden group">
+            <div class="text-zinc-400 text-xs font-mono mb-0.5 relative z-10">TOTAL INGRESS EVENTS</div>
+            <div id="kpi-total" class="text-xl font-bold text-white relative z-10">...</div>
+            <div
+                class="absolute -right-4 -bottom-4 opacity-10 blur-sm pointer-events-none transition-opacity group-hover:opacity-20">
+                <svg class="w-16 h-16" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                </svg>
+            </div>
+        </div>
+        <div class="glass-panel py-2 px-4 rounded-xl flex flex-col justify-center border-b-2 border-rose-500">
+            <div class="text-rose-500/80 text-xs font-mono mb-0.5">AUTONOMOUS BLOCKS</div>
+            <div id="kpi-blocks" class="text-xl font-bold text-rose-500 text-shadow-glow">...</div>
+        </div>
+        <div class="glass-panel py-2 px-4 rounded-xl flex flex-col justify-center border-b-2 border-cyan-400">
+            <div class="text-cyan-400/80 text-xs font-mono mb-0.5">AVG. INFERENCE LATENCY</div>
+            <div id="kpi-latency" class="text-xl font-bold text-cyan-400">...</div>
+        </div>
+
+    </div>
+
+    <!-- MAIN DASHBOARD CONTENT -->
+    <div class="grid grid-cols-12 gap-4 flex-grow overflow-hidden">
+
+        <!-- LEFT COLUMN: Intelligence Feed (Col Span 3) -->
+        <div class="col-span-3 glass-panel rounded-xl flex flex-col overflow-hidden h-full">
+            <div class="px-4 py-3 border-b border-zinc-800 bg-zinc-900/50 flex justify-between items-center">
+                <h2 class="text-sm font-semibold tracking-wider text-zinc-300">INTELLIGENCE FEED</h2>
+                <span class="flex h-2 w-2 relative"><span
+                        class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span><span
+                        class="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span></span>
+            </div>
+            <!-- Feed Container -->
+            <div id="feed-container" class="flex-grow overflow-y-auto p-2 space-y-2">
+                <!-- Feed Cards Go Here dynamically via JS -->
+            </div>
+        </div>
+
+        <!-- CENTER COLUMN: Global Threat Map (Col Span 6) -->
+        <div
+            class="col-span-6 glass-panel rounded-xl overflow-hidden relative shadow-2xl border border-zinc-800 h-full flex flex-col">
+            <div id="map" class="w-full h-full bg-zinc-950 z-0 relative"></div>
+            <!-- Overlay map title -->
+            <div
+                class="absolute top-4 left-4 z-10 bg-zinc-950/80 px-3 py-1.5 rounded-md border border-zinc-800 backdrop-blur pointer-events-none">
+                <span class="text-xs font-mono text-zinc-400 tracking-wider">LIVE GLOBAL TELEMETRY</span>
+            </div>
+            <!-- Overlay map legend -->
+            <div
+                class="absolute bottom-4 right-4 z-[400] bg-zinc-950/90 px-3 py-2.5 rounded-lg border border-zinc-800 backdrop-blur shadow-xl flex flex-col gap-2.5 pointer-events-none">
+                <div class="flex items-center gap-2 text-[10px] font-mono tracking-widest text-zinc-300">
+                    <svg class="w-4 h-4 text-rose-500 drop-shadow-[0_0_5px_rgba(244,63,94,0.8)]" fill="currentColor"
+                        viewBox="0 0 20 20">
+                        <path fill-rule="evenodd"
+                            d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944z"
+                            clip-rule="evenodd"></path>
+                    </svg>
+                    <span>NEURAL BLOCK</span>
+                </div>
+                <div class="flex items-center gap-2 text-[10px] font-mono tracking-widest text-zinc-300">
+                    <svg class="w-4 h-4 text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.8)]" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
+                        </path>
+                    </svg>
+                    <span>MONITOR ALLOW</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: AI Analytics & Logic Drawer (Col Span 3) -->
+        <div class="col-span-3 flex flex-col gap-4 h-full overflow-hidden">
+            <!-- Top Right: Latency Graph -->
+            <div class="glass-panel rounded-xl flex-col flex overflow-hidden h-[50%] shrink-0">
+                <div class="px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+                    <h2 class="text-sm font-semibold tracking-wider text-zinc-300">INFERENCE LATENCY (ms)</h2>
+                </div>
+                <div class="flex-grow p-4 relative bg-zinc-950/30 overflow-x-auto overflow-y-hidden custom-scrollbar">
+                    <div id="chart-scroll-container" style="height: 100%; min-width: 100%;">
+                        <canvas id="latencyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Right: Decision Logic Deep Dive -->
+            <div
+                class="glass-panel rounded-xl h-[50%] overflow-hidden flex flex-col border border-zinc-700 bg-zinc-900 relative min-h-0">
+                <div class="px-4 py-3 border-b border-zinc-800 bg-zinc-800/50">
+                    <h2 class="text-sm font-semibold tracking-wider text-white">NEURAL VERDICT INSPECTOR</h2>
+                </div>
+
+                <div id="inspector-placeholder"
+                    class="flex flex-col items-center justify-center h-full text-zinc-500 p-6 text-center">
+                    <svg class="w-12 h-12 mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    <p class="text-sm font-mono">Select an incident from the Intelligence Feed to inspect the Autonomous
+                        AI decision logic.</p>
+                </div>
+
+                <!-- Hidden by default until clicked -->
+                <div id="inspector-content" class="hidden flex-col h-full w-full p-3 gap-2 overflow-hidden">
+
+                    <!-- Row 1: IP + verdict badge inline -->
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-mono text-zinc-500 uppercase">IP:</span>
+                            <span id="insp-ip" class="text-sm font-mono text-white tracking-widest">---</span>
+                        </div>
+                        <div id="insp-badge"
+                            class="px-2 py-0.5 text-[10px] font-bold font-mono rounded uppercase tracking-widest border">
+                            ---
+                        </div>
+                    </div>
+
+                    <!-- Row 2: 2x2 stats grid -->
+                    <div class="grid grid-cols-2 gap-1.5 text-[10px] font-mono mt-2">
+                        <div
+                            class="bg-zinc-950 px-2 py-1 rounded border border-zinc-800 flex items-center gap-1.5 overflow-hidden">
+                            <span class="text-zinc-500 shrink-0">GEO:</span>
+                            <span id="insp-geo" class="text-zinc-200 truncate">---</span>
+                        </div>
+                        <div class="bg-zinc-950 px-2 py-1 rounded border border-zinc-800 flex items-center gap-1.5">
+                            <span class="text-zinc-500 shrink-0">ISP:</span>
+                            <span id="insp-isp" class="text-zinc-200 truncate">---</span>
+                        </div>
+                        <div class="bg-zinc-950 px-2 py-1 rounded border border-zinc-800 flex items-center gap-1.5">
+                            <span class="text-zinc-500 shrink-0">RISK:</span>
+                            <span id="insp-risk" class="font-bold">---</span>
+                        </div>
+                        <div class="bg-zinc-950 px-2 py-1 rounded border border-zinc-800 flex items-center gap-1.5">
+                            <span class="text-zinc-500 shrink-0">LAT:</span>
+                            <span id="insp-lat" class="text-cyan-400 font-bold">---</span>
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Intercepted Command (fixed height) -->
+                    <div>
+                        <div
+                            class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                            <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 9l3 3-3 3m5 0h3M4 15h1m1 0h1m-7-2h23"></path>
+                            </svg>
+                            Intercepted Command Payload
+                        </div>
+                        <div
+                            class="bg-[#050505] border border-zinc-800 px-3 py-2 rounded font-mono text-xs text-emerald-400 flex gap-2 items-start max-h-12 overflow-y-auto custom-scrollbar">
+                            <span class="text-zinc-600 select-none shrink-0">></span>
+                            <span id="insp-cmd" class="break-all">---</span>
+                        </div>
+                    </div>
+
+                    <!-- Row 4: AI Justification (fills remaining space) -->
+                    <div class="flex flex-col gap-1 flex-1 min-h-0">
+                        <div class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">AI Analytical
+                            Justification</div>
+                        <div
+                            class="bg-zinc-800/50 px-3 py-2 rounded border border-zinc-700 flex-1 overflow-y-auto custom-scrollbar">
+                            <p id="insp-justification" class="text-xs text-zinc-300 leading-snug">---</p>
+                        </div>
+                    </div>
+
+                    <!-- Row 5: Unblock button -->
+                    <button id="insp-unblock-btn" onclick="unblockCurrentIp()"
+                        class="hidden w-full py-1.5 rounded bg-zinc-900 border border-zinc-700 hover:border-cyan-400 hover:text-cyan-400 text-zinc-400 font-mono text-[10px] font-bold tracking-widest transition-colors flex items-center justify-center gap-2">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z">
+                            </path>
+                        </svg>
+                        UNBLOCK ORIGIN IP
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Print Only Table -->
+    <div id="print-container" class="hidden print:block w-full max-w-6xl mx-auto p-4">
+        <h1 class="text-2xl font-bold mb-6 font-sans text-black border-b-2 border-black pb-2">NEURAL CORE: INCIDENT
+            REPORT</h1>
+        <table class="w-full text-left border-collapse font-sans text-sm text-black">
+            <thead>
+                <tr class="border-b-2 border-zinc-400 bg-zinc-100">
+                    <th class="py-2 px-3">Timestamp &amp; Latency</th>
+                    <th class="py-2 px-3">Attacker Origin</th>
+                    <th class="py-2 px-3">Verdict &amp; Risk</th>
+                    <th class="py-2 px-3">Command</th>
+                    <th class="py-2 px-3">AI Justification</th>
+                </tr>
+            </thead>
+            <tbody id="print-tbody">
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Application Logic -->
+    <script>
+        // HARDCODED MAP COORDINATES FOR COUNTRIES IN JSON
+        const countryCoords = {
+            "Netherlands": [52.1326, 5.2913],
+            "Russia": [61.5240, 105.3188],
+            "China": [35.8617, 104.1954],
+            "USA": [37.0902, -95.7129],
+            "UK": [55.3781, -3.4360],
+            "Brazil": [-14.2350, -51.9253],
+            "Germany": [51.1657, 10.4515],
+            "South Korea": [35.9078, 127.7669],
+            "South Africa": [-30.5595, 22.9375],
+            "India": [20.5937, 78.9629],
+            "Romania": [45.9432, 24.9668]
+        };
+
+        // UI State
+        let allData = [];
+        let map;
+        let markerLayer;
+        let latencyChart;
+        let currentInspIp = null;
+
+        // Initialize App
+        document.addEventListener("DOMContentLoaded", () => {
+            initClock();
+            initSmartTelemetry();
+            initMap();
+            initChart();
+            fetchData();
+
+            // Poll for new incidents every 1 second for a highly responsive Intelligence Feed
+            setInterval(fetchData, 1000);
+        });
+
+        // Toggle Full Screen Function
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+
+        // Live UTC Clock
+        function initClock() {
+            setInterval(() => {
+                const now = new Date();
+                const h = String(now.getUTCHours()).padStart(2, '0');
+                const m = String(now.getUTCMinutes()).padStart(2, '0');
+                const s = String(now.getUTCSeconds()).padStart(2, '0');
+                document.getElementById('utc-clock').textContent = `${h}:${m}:${s} UTC`;
+            }, 1000);
+        }
+
+        // State for Smart Telemetry
+        let isProcessing = false;
+        let processingTimer = null;
+        let previousIncidentCount = 0;
+
+        // Smart Hardware Telemetry Simulation
+        async function updateSmartTelemetry() {
+            try {
+                // Dynamically build the API URL based on how the user opened the Dashboard
+                let hostIp = location.hostname;
+                if (!hostIp || hostIp === 'localhost' || hostIp === '') hostIp = '127.0.0.1';
+
+                const res = await fetch(`http://${hostIp}:6001/telemetry`);
+                if (!res.ok) throw new Error('Telemetry API not responding');
+                const hw = await res.json();
+
+                let cpu = Number(hw.cpu) || 0;
+                let ram = Number(hw.ram) || 0;
+                let temp = Number(hw.temp) || 0;
+                let gpu = Number(hw.gpu) || 0;
+
+                // If processing an incident, add a small artificial AI inference spike to the actual baseline metrics!
+                if (isProcessing) {
+                    cpu = Math.min(100, cpu + 35);
+                    gpu = Math.min(100, gpu + (gpu === 0 ? 80 : 30));
+                    temp = temp + 8;
+
+                    // Add pulsing animation to GPU
+                    document.getElementById('gpu-text').classList.add('animate-pulse', 'text-rose-400');
+                    document.getElementById('gpu-text').classList.remove('text-emerald-400');
+                } else {
+                    document.getElementById('gpu-text').classList.remove('animate-pulse', 'text-rose-400');
+                    document.getElementById('gpu-text').classList.add('text-emerald-400');
+                }
+
+                document.getElementById('cpu-bar').style.width = `${cpu}%`;
+                document.getElementById('cpu-text').textContent = `${cpu.toFixed(1)}%`;
+
+                document.getElementById('ram-bar').style.width = `${ram}%`;
+                document.getElementById('ram-text').textContent = `${ram.toFixed(1)}%`;
+
+                document.getElementById('temp-text').textContent = `${temp.toFixed(1)}°C`;
+                document.getElementById('gpu-text').textContent = `${gpu.toFixed(1)}%`;
+
+            } catch (err) {
+                console.error("Failed to fetch real telemetry:", err);
+                document.getElementById('cpu-text').textContent = "OFFLINE";
+            }
+        }
+
+        function triggerProcessingSpike() {
+            isProcessing = true;
+            updateSmartTelemetry(); // Force immediate update
+
+            if (processingTimer) clearTimeout(processingTimer);
+
+            // Cool-down after 5 seconds
+            processingTimer = setTimeout(() => {
+                isProcessing = false;
+                updateSmartTelemetry(); // Force return to base state
+            }, 5000);
+        }
+
+        function initSmartTelemetry() {
+            updateSmartTelemetry();
+            setInterval(updateSmartTelemetry, 2000);
+        }
+
+        // Initialize Map
+        function initMap() {
+            // Center roughly on Europe
+            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([30, 0], 2);
+
+            // Modern dark tiles layout (using CartoDB Dark Matter)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19,
+            }).addTo(map);
+
+            // Create a dedicated layer group for easy clearing of historical markers
+            markerLayer = L.layerGroup().addTo(map);
+        }
+
+        // Initialize Chart
+        function initChart() {
+            const ctx = document.getElementById('latencyChart').getContext('2d');
+
+            Chart.defaults.color = '#71717a'; // zinc-500
+            Chart.defaults.font.family = '"Inter", sans-serif';
+
+            latencyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Inference Latency (s)',
+                        data: [],
+                        borderColor: '#22d3ee', // cyan-400
+                        backgroundColor: 'rgba(34, 211, 238, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#fff',
+                        pointRadius: 3,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            min: -1,
+                            max: 6.0,
+                            grid: { color: 'rgba(63, 63, 70, 0.4)' }, // zinc-700
+                            ticks: { font: { family: "'Fira Code', monospace", size: 10 } }
+                        },
+                        x: {
+                            display: false,
+                            grid: { display: false }
+                        }
+                    },
+                    interaction: { mode: 'nearest', axis: 'x', intersect: false },
+                },
+                plugins: [{
+                    id: 'thresholdLine',
+                    beforeDraw: (chart) => {
+                        const { ctx, chartArea: { left, right }, scales: { y } } = chart;
+                        // Draw red fail-open line at 5.5s
+                        if (y.min <= 5.5 && y.max >= 5.5) {
+                            const yCoord = y.getPixelForValue(5.5);
+                            ctx.save();
+                            ctx.beginPath();
+                            ctx.moveTo(left, yCoord);
+                            ctx.lineTo(right, yCoord);
+                            ctx.lineWidth = 1;
+                            ctx.strokeStyle = 'rgba(244, 63, 94, 0.7)'; // rose-500
+                            ctx.setLineDash([5, 5]);
+                            ctx.stroke();
+
+                            // Text Label
+                            ctx.fillStyle = 'rgba(244, 63, 94, 0.8)';
+                            ctx.font = '10px "Fira Code"';
+                            ctx.fillText('FAIL-OPEN TIMEOUT', left + 5, yCoord - 5);
+                            ctx.restore();
+                        }
+                    }
+                }]
+            });
+        }
+
+        // Fetch Data and Populate UI
+        async function fetchData() {
+            try {
+                let hostIp = location.hostname;
+                if (!hostIp || hostIp === 'localhost' || hostIp === '') hostIp = '127.0.0.1';
+                const response = await fetch(`http://${hostIp}:5000/api/metrics?t=${Date.now()}`);
+                const data = await response.json();
+
+                const isFirstLoad = previousIncidentCount === 0;
+
+                // OPTIMIZATION: Do not force a heavy DOM re-render of the Feed/Chart/Map if the dataset hasn't physically changed
+                if (!isFirstLoad && data.length === previousIncidentCount) {
+                    return;
+                }
+
+                if (!isFirstLoad && data.length > previousIncidentCount) {
+                    triggerProcessingSpike();
+                }
+                previousIncidentCount = data.length;
+
+                allData = data.reverse(); // Newest first
+
+                updateKPIs(data);
+                populateFeed(allData);
+                plotMap(allData);
+                updateChart(data); // Feed original chronological data to chart
+                populatePrintTable(allData); // Build print view table
+
+            } catch (err) {
+                console.error("Error loading JSON metrics:", err);
+                // Fallback rendering
+                document.getElementById('feed-container').innerHTML = `<div class="p-4 text-rose-500 font-mono text-sm text-center">ERROR: Could not fetch Intelligence Feed from the Raspberry Pi.<br>Is the Edge Sensor offline?</div>`;
+            }
+        }
+
+        // Update KPI Counters
+        function updateKPIs(data) {
+            const total = data.length;
+            const blocked = data.filter(d => d.ai_decision === 'BLOCK').length;
+
+            const avgLat = data.reduce((acc, curr) => acc + curr.latency, 0) / total || 0;
+
+            document.getElementById('kpi-total').textContent = total.toLocaleString();
+            document.getElementById('kpi-blocks').textContent = blocked.toLocaleString();
+            document.getElementById('kpi-latency').textContent = avgLat.toFixed(2) + 's';
+        }
+
+        // Draw Map Pins
+        function plotMap(data) {
+            // Prevent exponential memory leak by flushing the layer before plotting the new dataset
+            if (markerLayer) markerLayer.clearLayers();
+
+            data.forEach(item => {
+                const geo = item.geolocation.country;
+                const coords = countryCoords[geo];
+                if (coords) {
+                    // Slight randomization so pins in same country don't fully overlap
+                    const jitterLat = coords[0] + (Math.random() - 0.5) * 2.0;
+                    const jitterLng = coords[1] + (Math.random() - 0.5) * 2.0;
+
+                    const isBlock = item.ai_decision === 'BLOCK';
+                    const isDisconnect = item.ai_decision === 'DISCONNECT';
+
+                    const shieldHtml = `<svg class="w-5 h-5 text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.8)] animate-pulse" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944z" clip-rule="evenodd"></path></svg>`;
+                    const eyeHtml = `<svg class="w-5 h-5 text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)] animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>`;
+                    const disconnectHtml = `<svg class="w-5 h-5 text-purple-400 drop-shadow-[0_0_8px_rgba(192,132,252,0.8)] animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M5.636 5.636a9 9 0 000 12.728m0 0l2.829-2.829m-2.829 2.829L3 21"></path></svg>`;
+
+                    let finalHtml = eyeHtml;
+                    if (isBlock) finalHtml = shieldHtml;
+                    else if (isDisconnect) finalHtml = disconnectHtml;
+
+                    const icon = L.divIcon({
+                        className: 'custom-pin bg-transparent border-0',
+                        html: finalHtml,
+                        iconSize: [20, 20],
+                        iconAnchor: [10, 10]
+                    });
+
+                    L.marker([jitterLat, jitterLng], { icon: icon }).addTo(markerLayer)
+                        .bindTooltip(`<b>${geo}</b><br>${item.attacker_ip} [${item.ai_decision}]`, { className: 'bg-zinc-900 text-white border-zinc-700' });
+                }
+            });
+        }
+
+        function updateChart(data) {
+            const container = document.getElementById('chart-scroll-container');
+            const wrapper = container.parentElement;
+
+            // Determine if the user is actively viewing the newest data (at the far right)
+            // We use a 50px buffer to be forgiving.
+            const isScrolledToRight = wrapper.scrollWidth - wrapper.clientWidth <= wrapper.scrollLeft + 50;
+
+            // Dynamically stretch the canvas container to prevent visual data squishing
+            const minWidth = Math.max(100, data.length * 15);
+            container.style.minWidth = minWidth + 'px';
+
+            // Pass the entire chronological array to the chart now that scrolling is unlocked
+            latencyChart.data.labels = data.map(d => d.timestamp.split(' ')[1]);
+            latencyChart.data.datasets[0].data = data.map(d => d.latency);
+            latencyChart.update();
+
+            // Programmatically auto-scroll ONLY if the user was already looking at the newest telemetry
+            if (isScrolledToRight || previousIncidentCount === 0) {
+                // Slight delay ensures the DOM engine has calculated the new minWidth
+                setTimeout(() => {
+                    wrapper.scrollLeft = wrapper.scrollWidth;
+                }, 10);
+            }
+        }
+
+        // Populate Left Feed
+        function populateFeed(data) {
+            const container = document.getElementById('feed-container');
+            container.innerHTML = '';
+
+            data.forEach((item, index) => {
+                const isBlock = item.ai_decision === 'BLOCK';
+                const isDisconnect = item.ai_decision === 'DISCONNECT';
+
+                let borderColor = 'border-cyan-400';
+                let pillColor = 'bg-cyan-400/20 text-cyan-400';
+                let indicatorColor = 'bg-cyan-400';
+
+                if (isBlock) {
+                    borderColor = 'border-rose-500';
+                    pillColor = 'bg-rose-500/20 text-rose-500';
+                    indicatorColor = 'bg-rose-500';
+                } else if (isDisconnect) {
+                    borderColor = 'border-purple-400';
+                    pillColor = 'bg-purple-500/20 text-purple-400';
+                    indicatorColor = 'bg-purple-400';
+                }
+
+                const risk = item.risk_score || 0;
+                let riskColorClass = 'text-emerald-400';
+                if (risk > 70) riskColorClass = 'text-rose-500';
+                else if (risk > 30) riskColorClass = 'text-amber-500';
+
+                // We encode the array index directly into the onclick
+                const card = document.createElement('div');
+                card.className = `p-3 rounded-lg border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 transition-all cursor-pointer border-l-4 ${borderColor} group`;
+                card.onclick = () => openInspector(index);
+
+                // Highlight Map marker behavior normally happens here (left out for simplicity without refactoring leaflets array)
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-1">
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full ${indicatorColor}"></span>
+                            <span class="text-zinc-500 text-[10px] font-mono">${item.timestamp}</span>
+                        </div>
+                        <div class="flex gap-1.5">
+                            <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-zinc-800/80 ${riskColorClass} border border-zinc-700">
+                                RISK: ${risk}
+                            </span>
+                            <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${pillColor}">
+                                ⚡ ${item.latency.toFixed(2)}s
+                            </span>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <p class="text-sm font-semibold text-zinc-200 leading-tight group-hover:text-white transition-colors">
+                            ${item.summary}
+                        </p>
+                    </div>
+                    <div class="bg-zinc-950 border border-zinc-800 rounded p-1.5 overflow-hidden">
+                        <p class="text-xs font-mono text-zinc-400 truncate">
+                            > <span class="text-zinc-300">${item.command}</span>
+                        </p>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // Open Inspector Panel (Bottom Right)
+        function openInspector(dataIndex) {
+            const item = allData[dataIndex];
+            currentInspIp = item.attacker_ip;
+
+            document.getElementById('inspector-placeholder').classList.add('hidden');
+            document.getElementById('inspector-content').classList.remove('hidden');
+
+            document.getElementById('insp-ip').textContent = item.attacker_ip;
+
+            const badge = document.getElementById('insp-badge');
+            badge.textContent = item.ai_decision;
+
+            const unblockBtn = document.getElementById('insp-unblock-btn');
+
+            // Check historical block status across entire feed for this IP
+            const isCurrentlyBlocked = allData.some(d => d.attacker_ip === item.attacker_ip && d.ai_decision === 'BLOCK');
+
+            // 1. Setup the Event Badge Styling (Based on this specific packet)
+            if (item.ai_decision === 'BLOCK') {
+                badge.className = 'px-2 py-0.5 text-[10px] font-bold font-mono rounded uppercase tracking-widest border border-rose-500 bg-rose-500/10 text-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.3)]';
+            } else if (item.ai_decision === 'DISCONNECT') {
+                badge.className = 'px-2 py-0.5 text-[10px] font-bold font-mono rounded uppercase tracking-widest border border-purple-400 bg-purple-500/10 text-purple-400 shadow-[0_0_10px_rgba(192,132,252,0.3)]';
+            } else {
+                badge.className = 'px-2 py-0.5 text-[10px] font-bold font-mono rounded uppercase tracking-widest border border-cyan-400 bg-cyan-400/10 text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.3)]';
+            }
+
+            // 2. Setup the Unblock Button Visibility (Based on global block status)
+            if (isCurrentlyBlocked) {
+                unblockBtn.classList.remove('hidden');
+                unblockBtn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path></svg> UNBLOCK ORIGIN IP`;
+                unblockBtn.disabled = false;
+                unblockBtn.className = 'w-full py-1.5 rounded bg-zinc-900 border border-zinc-700 hover:border-cyan-400 hover:text-cyan-400 text-zinc-400 font-mono text-[10px] font-bold tracking-widest transition-colors flex items-center justify-center gap-2';
+            } else {
+                unblockBtn.classList.add('hidden');
+            }
+
+            document.getElementById('insp-geo').textContent = `${item.geolocation.city}, ${item.geolocation.country}`;
+            document.getElementById('insp-isp').textContent = item.geolocation.isp || '—';
+            document.getElementById('insp-lat').textContent = `${(item.latency || 0).toFixed(2)}s`;
+
+            const riskEl = document.getElementById('insp-risk');
+            const risk = item.risk_score || 0;
+            riskEl.textContent = `${risk} / 100`;
+            if (risk > 70) riskEl.className = 'text-rose-500 font-bold shadow-rose-500/20';
+            else if (risk > 30) riskEl.className = 'text-amber-500 font-bold';
+            else riskEl.className = 'text-emerald-400 font-bold';
+
+            document.getElementById('insp-cmd').textContent = item.command;
+            document.getElementById('insp-justification').textContent = item.ai_justification;
+        }
+
+        async function unblockCurrentIp() {
+            if (!currentInspIp) return;
+            const btn = document.getElementById('insp-unblock-btn');
+
+            btn.innerHTML = `<span class="animate-pulse flex items-center gap-2"><svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-cyan-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> UNBLOCKING...</span>`;
+            btn.disabled = true;
+            btn.className = 'w-full py-2.5 mt-2 rounded bg-zinc-900 border border-zinc-700 text-zinc-500 font-mono text-[11px] font-bold tracking-widest flex items-center justify-center gap-2 shadow-md cursor-not-allowed';
+
+            try {
+                let hostIp = location.hostname;
+                if (!hostIp || hostIp === 'localhost' || hostIp === '') hostIp = '127.0.0.1';
+                const res = await fetch(`http://${hostIp}:5000/unblock/${currentInspIp}`, {
+                    method: 'GET'
+                });
+
+                if (res.ok) {
+                    btn.className = 'w-full py-2.5 mt-2 rounded bg-zinc-700 border border-zinc-600 text-zinc-300 font-mono text-[11px] font-bold tracking-widest flex items-center justify-center gap-2 shadow-md cursor-not-allowed';
+                    btn.innerHTML = `🔓 IP UNBLOCKED`;
+                } else {
+                    btn.innerHTML = `ERROR (API FAILED)`;
+                }
+            } catch (e) {
+                console.error(e);
+                btn.innerHTML = `ERROR (SEE CONSOLE)`;
+            }
+        }
+
+        function populatePrintTable(data) {
+            const tbody = document.getElementById('print-tbody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-zinc-200 break-inside-avoid';
+
+                const isBlock = item.ai_decision === 'BLOCK';
+                const isDisconnect = item.ai_decision === 'DISCONNECT';
+                const verdictClass = isBlock ? 'text-rose-600 font-bold' : isDisconnect ? 'text-purple-600 font-bold' : 'text-cyan-600 font-bold';
+
+                const risk = item.risk_score ?? 0;
+                const riskClass = risk > 70 ? 'color:#dc2626;font-weight:bold' : risk > 30 ? 'color:#d97706;font-weight:bold' : 'color:#16a34a;font-weight:bold';
+
+                // Dwell time is stored in ai_justification for DISCONNECT events
+                const latencyDisplay = isDisconnect
+                    ? `<div style="font-size:10px;color:#7c3aed;font-weight:600">⏱ ${item.ai_justification}</div>`
+                    : `<div style="font-family:monospace;font-size:10px;color:#71717a">Lat: ${(item.latency || 0).toFixed(2)}s</div>`;
+
+                tr.innerHTML = `
+                    <td class="py-4 px-3 align-top whitespace-nowrap">
+                        <div style="font-family:monospace;font-size:11px">${item.timestamp}</div>
+                        ${latencyDisplay}
+                    </td>
+                    <td class="py-4 px-3 align-top">
+                        <div style="font-family:monospace;font-size:12px;font-weight:600">${item.attacker_ip}</div>
+                        <div style="font-size:11px;margin-top:2px">${item.geolocation.city}, ${item.geolocation.country}</div>
+                        <div style="font-size:10px;color:#71717a;margin-top:1px">${item.geolocation.isp || ''}</div>
+                    </td>
+                    <td class="py-4 px-3 align-top">
+                        <span class="${verdictClass}" style="font-size:12px;letter-spacing:.05em">${item.ai_decision}</span>
+                        ${!isDisconnect ? `<div style="margin-top:4px;font-size:11px">Risk: <span style="${riskClass}">${risk}/100</span></div>` : ''}
+                    </td>
+                    <td class="py-4 px-3 align-top" style="max-width:160px">
+                        <div style="font-family:monospace;font-size:10px;background:#f4f4f5;padding:4px 6px;border-radius:4px;border:1px solid #d4d4d8;word-break:break-all">&gt; ${item.command}</div>
+                    </td>
+                    <td class="py-4 px-3 align-top" style="max-width:200px">
+                        <div style="font-size:11px;color:#3f3f46">${isDisconnect ? '—' : (item.ai_justification || '—')}</div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+    </script>
+</body>
+
+</html>

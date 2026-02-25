@@ -1,0 +1,74 @@
+# Raspberry Pi Honeypot Testing Guide
+
+## 1. Start the AI Brain (On Windows PC)
+Always start the Brain Server first so the AI can evaluate commands in real-time.
+```cmd
+python src/brain_server.py
+```
+
+## 2. Emulate an Attack (New Windows CMD Window)
+Open a separate Command Prompt window and SSH into the Raspberry Pi honeypot using the dummy credentials `admin` or `root` with password `1234`.
+```cmd
+ssh root@<RASPBERRY_PI_IP> -p 2222
+```
+
+## 3. Test Deception (ALLOW Action)
+Type reconnaissance commands to watch the AI spawn dynamic decoy files (like .env or passwords.txt) into your directory.
+```bash
+cd /var
+pwd
+ls
+cat /etc/passwd
+```
+
+## 4. Test Enforcement (BLOCK Action)
+Type a destructive command. The AI will synchronously lock your terminal for ~1.7 seconds while it thinks, then instantly terminate your SSH connection and globally IP-block you.
+```bash
+rm -rf /
+```
+
+---
+
+## What Happens if the Raspberry Pi Reboots?
+Because we deployed the honeypot using Docker Compose with "daemon" mode, you usually **do not need to do anything** if the Raspberry Pi loses power or restarts! Docker is configured to automatically turn the honeypot back on as soon as the Pi boots up.
+
+However, if you ever need to manually restart the honeypot or check if it is running:
+
+1. SSH into the Raspberry Pi:
+```cmd
+ssh <PI_USERNAME>@<RASPBERRY_PI_IP>
+```
+*(Enter your real Raspberry Pi password)*
+
+2. Navigate to the project folder on the Pi:
+```bash
+cd /home/<PI_USERNAME>/dsrt
+```
+
+3. To **Check the Status** of the honeypot:
+```bash
+sudo docker compose ps
+```
+
+4. To **Manually Force Start/Restart** the honeypot:
+```bash
+sudo docker compose up -d
+```
+
+5. To **Completely Turn Off** the honeypot:
+```bash
+sudo docker compose down
+```
+
+---
+
+## How to Unblock Your IP Address
+If you get locked out during testing, the Raspberry Pi Controller will automatically permanently ban your Windows IP across all sensors. 
+
+To unblock yourself so you can test again, run this command in a normal Windows CMD prompt:
+```cmd
+curl http://<RASPBERRY_PI_IP>:5000/unblock/<YOUR_WINDOWS_IP>
+```
+Or simply paste `http://<RASPBERRY_PI_IP>:5000/unblock/<YOUR_WINDOWS_IP>` into your web browser. 
+
+The honeypot will automatically sync the updated blocklist within 10 seconds, allowing you to SSH back in.

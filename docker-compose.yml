@@ -1,0 +1,28 @@
+
+services:
+  controller:
+    build: .
+    command: python controller_server.py
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./logs:/app/logs
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - API_KEY=${API_KEY}
+      - BRAIN_URL=${BRAIN_URL}
+      - LOGS_DIR=/app/logs
+
+  honeypot:
+    build: .
+    command: python honeypot.py
+    ports:
+      - "2222:2222"
+    environment:
+      - CONTROLLER_URL=${CONTROLLER_URL}
+      - SENSOR_ID=${SENSOR_ID}
+      - API_KEY=${API_KEY}
+      - ALLOW_ALL_CREDS=False # Change to True for High-Interaction (Deception) Mode, False for Low-Interaction (Brute-Force)
+    depends_on:
+      - controller

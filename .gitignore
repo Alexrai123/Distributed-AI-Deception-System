@@ -1,0 +1,73 @@
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Keys and Secrets
+*.key
+*.pem
+*.p8
+*.pub
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Logs and Databases
+logs/
+*.log
+*.sqlite
+*.sqlite3
+db.sqlite3
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temporary files
+tmp/
+temp/
+*.bak
+*.tmp
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# Build and Cache
+.cache/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Node (If applicable in future)
+node_modules/
+npm-debug.log
+yarn-error.log
